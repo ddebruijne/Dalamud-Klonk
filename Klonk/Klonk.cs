@@ -37,6 +37,8 @@ namespace Klonk
             DalamudContainer.PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
 
             DalamudContainer.Framework.Update += OnUpdate;
+            DalamudContainer.ClientState.Login += OnLogin;
+            DalamudContainer.ClientState.Logout += OnLogout;
         }
 
         public void Dispose()
@@ -61,7 +63,20 @@ namespace Klonk
             if (!isConnected)
                 return;
 
-            port.WriteLine(DalamudContainer.ClientState.LocalPlayer.CurrentHp.ToString());
+            string hp = DalamudContainer.ClientState.LocalPlayer.CurrentHp.ToString();
+            hp.PadLeft(8);
+
+            port.WriteLine(hp);
+        }
+
+        private unsafe void OnLogin(object sender, System.EventArgs e)
+        {
+            ActivateKlonk();
+        }
+
+        private unsafe void OnLogout(object sender, System.EventArgs e)
+        {
+            DeactivateKlonk();
         }
 
         private void DrawUI()
@@ -76,6 +91,9 @@ namespace Klonk
 
         private void ActivateKlonk()
         {
+            if (isConnected)
+                return;
+
             port = new SerialPortStream(this.Configuration.SerialPort, 115200);
             try
             {
