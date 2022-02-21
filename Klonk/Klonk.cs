@@ -50,8 +50,6 @@ namespace Klonk
 
         private void OnCommand(string command, string args)
         {
-            // in response to the slash command, just display our main ui
-            //this.UI.Visible = true;
             if (!isConnected)
                 ActivateKlonk();
             else
@@ -64,7 +62,7 @@ namespace Klonk
                 return;
 
             string hp = DalamudContainer.ClientState.LocalPlayer.CurrentHp.ToString();
-            hp.PadLeft(8);
+            hp = hp.PadLeft(8, '0');
 
             port.WriteLine(hp);
         }
