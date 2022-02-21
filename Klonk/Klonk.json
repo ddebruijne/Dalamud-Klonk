@@ -1,0 +1,10 @@
+{
+  "Author": "Danny de Bruijne",
+  "Name": "Klonk",
+  "Description": "Displays data on Phalanx-based VFD and Nixie devices",
+  "InternalName": "Klonk",
+  "AssemblyVersion": "1.0.0.0",
+  "RepoUrl": "https://github.com/danskidb/Dalamud-Klonk",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 5
+}
