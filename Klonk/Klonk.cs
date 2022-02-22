@@ -43,6 +43,9 @@ namespace Klonk
             DalamudContainer.Framework.Update += OnUpdate;
             DalamudContainer.ClientState.Login += OnLogin;
             DalamudContainer.ClientState.Logout += OnLogout;
+
+            if (DalamudContainer.ClientState.IsLoggedIn)
+                ActivateKlonk();
         }
 
         public void Dispose()
@@ -60,6 +63,11 @@ namespace Klonk
                 DeactivateKlonk();
         }
 
+        private string GetPaddedHP(PlayerCharacter p)
+        {
+            return p.CurrentHp.ToString().PadLeft(Configuration.AmountTubes, '0');
+        }
+
         private unsafe void OnUpdate(Framework framework)
         {
             if (!isConnected)
@@ -67,32 +75,32 @@ namespace Klonk
 
             // Separate events based on whether we're in combat or not.
             PlayerCharacter localPlayer = DalamudContainer.ClientState.LocalPlayer;
-            if (localPlayer.StatusFlags == StatusFlags.InCombat)
+            GameObject currentTarget = DalamudContainer.TargetManager.FocusTarget != null ? DalamudContainer.TargetManager.FocusTarget : DalamudContainer.TargetManager.Target;
+            if ((localPlayer.StatusFlags & StatusFlags.InCombat) != 0)
             {
-                if (localPlayer.TargetObject != null && localPlayer.TargetObject.ObjectKind == ObjectKind.BattleNpc)
+                if (localPlayer.TargetObject != null && currentTarget.ObjectKind == ObjectKind.BattleNpc)
                 {
-                    BattleChara bc = (BattleChara)localPlayer.TargetObject;
+                    BattleChara bc = (BattleChara)currentTarget;
                     if(bc == null)
                     {
-                        DalamudContainer.ChatGui.PrintError("OnUpdate: Could not cast localPlayer.TargetObject to BattleChara!");
+                        DalamudContainer.ChatGui.PrintError("OnUpdate: Could not cast currentTarget to BattleChara!");
                         DeactivateKlonk();
                     }
 
                     if (bc.IsCasting)
-                    {
-                        int remaining = (int)(bc.TotalCastTime - bc.CurrentCastTime);
-                        clockString = remaining.ToString().PadLeft(Configuration.AmountTubes, '0');
-                    }
+                        clockString = (bc.TotalCastTime - bc.CurrentCastTime).ToString("0.00");
+                    else
+                        clockString = GetPaddedHP(localPlayer);
                 }
                 else
-                    clockString = localPlayer.CurrentHp.ToString().PadLeft(Configuration.AmountTubes, '0');
+                    clockString = GetPaddedHP(localPlayer);
             }
             else
             {
-                if (Configuration.SupportsText && localPlayer.TargetObject != null)
-                    clockString = localPlayer.TargetObject.Name.TextValue;
+                if (Configuration.SupportsText && currentTarget != null)
+                    clockString = currentTarget.Name.TextValue;
                 else
-                    clockString = localPlayer.CurrentHp.ToString().PadLeft(Configuration.AmountTubes, '0');
+                    clockString = GetPaddedHP(localPlayer);
             }
 
             // To not spam the device, only send an update when the text differs.
