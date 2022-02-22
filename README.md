@@ -1,7 +1,7 @@
 # Klonk
 Displays Final Fantasy XIV data on Phalanx-based VFD and Nixie devices.
 
-![Klonk](https://i.imgur.com/yyskQfA.png)
+![Klonk](https://i.imgur.com/zcmj0vy.png)
 
 ### Building & Testing
 - Get XIVLauncher, boot the game and verify it works
