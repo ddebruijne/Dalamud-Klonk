@@ -55,6 +55,20 @@ namespace Klonk
                     this.configuration.SerialPort = comport;
                     this.configuration.Save();
                 }
+
+                int tubes = this.configuration.AmountTubes;
+                if (ImGui.DragInt("Amount Tubes", ref tubes, 1, 0, 10))
+                {
+                    this.configuration.AmountTubes = tubes;
+                    this.configuration.Save();
+                }
+
+                bool txt = this.configuration.SupportsText;
+                if (ImGui.Checkbox("Supports Text", ref txt))
+                {
+                    this.configuration.SupportsText = txt;
+                    this.configuration.Save();
+                }
             }
             ImGui.End();
         }

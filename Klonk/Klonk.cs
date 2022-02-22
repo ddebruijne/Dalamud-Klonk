@@ -5,19 +5,23 @@ using System;
 using System.IO;
 using Dalamud.Game;
 using RJCP.IO.Ports;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 
 namespace Klonk
 {
     public class Klonk : IDalamudPlugin
     {
         public string Name => "Klonk";
-
         private const string CommandName = "/klonk";
 
         private Configuration Configuration { get; init; }
         private KlonkUI UI { get; init; }
         private SerialPortStream port;
         private bool isConnected = false;
+        private string lastKnownClockString = string.Empty;
+        private string clockString = string.Empty;
 
         public Klonk([RequiredVersion("1.0")] DalamudPluginInterface pluginInterface)
         {
@@ -61,10 +65,42 @@ namespace Klonk
             if (!isConnected)
                 return;
 
-            string hp = DalamudContainer.ClientState.LocalPlayer.CurrentHp.ToString();
-            hp = hp.PadLeft(8, '0');
+            // Separate events based on whether we're in combat or not.
+            PlayerCharacter localPlayer = DalamudContainer.ClientState.LocalPlayer;
+            if (localPlayer.StatusFlags == StatusFlags.InCombat)
+            {
+                if (localPlayer.TargetObject != null && localPlayer.TargetObject.ObjectKind == ObjectKind.BattleNpc)
+                {
+                    BattleChara bc = (BattleChara)localPlayer.TargetObject;
+                    if(bc == null)
+                    {
+                        DalamudContainer.ChatGui.PrintError("OnUpdate: Could not cast localPlayer.TargetObject to BattleChara!");
+                        DeactivateKlonk();
+                    }
 
-            port.WriteLine(hp);
+                    if (bc.IsCasting)
+                    {
+                        int remaining = (int)(bc.TotalCastTime - bc.CurrentCastTime);
+                        clockString = remaining.ToString().PadLeft(Configuration.AmountTubes, '0');
+                    }
+                }
+                else
+                    clockString = localPlayer.CurrentHp.ToString().PadLeft(Configuration.AmountTubes, '0');
+            }
+            else
+            {
+                if (Configuration.SupportsText && localPlayer.TargetObject != null)
+                    clockString = localPlayer.TargetObject.Name.TextValue;
+                else
+                    clockString = localPlayer.CurrentHp.ToString().PadLeft(Configuration.AmountTubes, '0');
+            }
+
+            // To not spam the device, only send an update when the text differs.
+            if (!clockString.Equals(lastKnownClockString))
+            {
+                lastKnownClockString = clockString;
+                port.WriteLine(clockString);
+            }
         }
 
         private unsafe void OnLogin(object sender, System.EventArgs e)
@@ -97,7 +133,7 @@ namespace Klonk
             {
                 port.Open();
                 port.WriteLine("Hello from FFXIV");
-                DalamudContainer.ChatGui.Print("Successfully connected.");
+                DalamudContainer.ChatGui.Print("Successfully connected to klonk.");
                 isConnected = true;
             }
             catch (UnauthorizedAccessException ex)
@@ -122,7 +158,9 @@ namespace Klonk
             if (!isConnected)
                 return;
 
-            port.WriteLine("...");
+            DalamudContainer.ChatGui.Print("Disconnected from klonk.");
+            string exit = string.Empty.PadLeft(Configuration.AmountTubes, '.');
+            port.WriteLine(exit);
             port.Close();
             port.Dispose();
             port = null;
