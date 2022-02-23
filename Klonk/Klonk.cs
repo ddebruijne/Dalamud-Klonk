@@ -139,8 +139,8 @@ namespace Klonk
             port = new SerialPortStream(this.Configuration.SerialPort, 115200);
             try
             {
-                port.Open();
-                port.WriteLine("Hello from FFXIV");
+                port.OpenDirect();
+                port.WriteLine("[MODE]serial");
                 DalamudContainer.ChatGui.Print("Successfully connected to klonk.");
                 isConnected = true;
             }
@@ -167,11 +167,12 @@ namespace Klonk
                 return;
 
             DalamudContainer.ChatGui.Print("Disconnected from klonk.");
-            string exit = string.Empty.PadLeft(Configuration.AmountTubes, '.');
-            port.WriteLine(exit);
+            port.WriteLine("[MODE]normal");
             port.Close();
             port.Dispose();
             port = null;
+            lastKnownClockString = string.Empty;
+            clockString = string.Empty;
             isConnected = false;
         }
     }
