@@ -4,6 +4,8 @@ Displays Final Fantasy XIV data on Phalanx-based VFD and Nixie devices.
 ![Klonk](https://i.imgur.com/zcmj0vy.png)
 
 ## Displayed Data
+On start of the game, the plugin will automatically attempt to establish a connection with the serial device, but can be manually toggled with /klonk.
+
 ### In Combat
 Displays your own HP in normal circumstances, until the selected target (or focus target if set) is casting a skill - then it will display the remaining time until that cast timer runs out.
 
