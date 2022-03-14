@@ -2,12 +2,12 @@
 using Dalamud.Plugin;
 using Dalamud.IoC;
 using System;
-using System.IO;
 using Dalamud.Game;
-using RJCP.IO.Ports;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
+using System.Net.Sockets;
+using System.Text;
 
 namespace Klonk
 {
@@ -18,14 +18,18 @@ namespace Klonk
 
         private Configuration Configuration { get; init; }
         private KlonkUI UI { get; init; }
-        private SerialPortStream port;
+        private UdpClient udpClient;
+
         private bool isConnected = false;
         private string lastKnownClockString = string.Empty;
         private string clockString = string.Empty;
+        private double timeSinceLastKeepalive = 0;
+        private double timeSinceLastSendString = 0;
 
         public Klonk([RequiredVersion("1.0")] DalamudPluginInterface pluginInterface)
         {
             DalamudContainer.Initialize(pluginInterface);
+            udpClient = new UdpClient();
 
             this.Configuration = DalamudContainer.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             this.Configuration.Initialize(DalamudContainer.PluginInterface);
@@ -73,6 +77,22 @@ namespace Klonk
             if (!isConnected)
                 return;
 
+            if (timeSinceLastKeepalive >= 1000)
+            {
+                Byte[] hello = Encoding.ASCII.GetBytes("KEEPALIVE|FinalFantasyXIV");
+                try
+                {
+                    udpClient.Send(hello, hello.Length, "127.0.0.1", 11001);
+                }
+                catch (Exception e)
+                {
+                    DalamudContainer.ChatGui.PrintError(e.ToString());
+                }
+
+                timeSinceLastKeepalive = 0;
+            }
+            timeSinceLastKeepalive += framework.UpdateDelta.TotalMilliseconds;
+
             // Separate events based on whether we're in combat or not.
             PlayerCharacter localPlayer = DalamudContainer.ClientState.LocalPlayer;
             GameObject currentTarget = DalamudContainer.TargetManager.FocusTarget != null ? DalamudContainer.TargetManager.FocusTarget : DalamudContainer.TargetManager.Target;
@@ -104,11 +124,25 @@ namespace Klonk
             }
 
             // To not spam the device, only send an update when the text differs.
-            if (!clockString.Equals(lastKnownClockString))
+            if (!clockString.Equals(lastKnownClockString) || timeSinceLastSendString >= 1000)
             {
                 lastKnownClockString = clockString;
-                port.WriteLine(clockString);
+
+                String s = "SENDDATA|FinalFantasyXIV|" + clockString;
+                Byte[] senddata = Encoding.ASCII.GetBytes(s);
+                try
+                {
+                    udpClient.Send(senddata, senddata.Length, "127.0.0.1", 11001);
+                    Console.WriteLine(s);
+                }
+                catch (Exception e)
+                {
+                    DalamudContainer.ChatGui.PrintError(e.ToString());
+                }
+
+                timeSinceLastSendString = 0;
             }
+            timeSinceLastSendString += framework.UpdateDelta.TotalMilliseconds;
         }
 
         private unsafe void OnLogin(object sender, System.EventArgs e)
@@ -136,29 +170,17 @@ namespace Klonk
             if (isConnected)
                 return;
 
-            port = new SerialPortStream(this.Configuration.SerialPort, 115200);
+            Byte[] hello = Encoding.ASCII.GetBytes("HELLO|FinalFantasyXIV");
             try
             {
-                port.OpenDirect();
-                port.WriteLine("[MODE]serial");
-                DalamudContainer.ChatGui.Print("Successfully connected to klonk.");
-                isConnected = true;
+                udpClient.Send(hello, hello.Length, "127.0.0.1", 11001);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (Exception e)
             {
-                DalamudContainer.ChatGui.PrintError("Port " + port.ToString() + " is in use.");
-                isConnected = false;
+                DalamudContainer.ChatGui.PrintError(e.ToString());
             }
-            catch (IOException ex)
-            {
-                DalamudContainer.ChatGui.PrintError("Port " + port.ToString() + " does not exist.");
-                isConnected = false;
-            }
-            catch (Exception ex)
-            {
-                DalamudContainer.ChatGui.PrintError("uart exception " + ex.ToString());
-                isConnected = false;
-            }
+
+            isConnected = true;
         }
 
         private void DeactivateKlonk()
@@ -167,10 +189,16 @@ namespace Klonk
                 return;
 
             DalamudContainer.ChatGui.Print("Disconnected from klonk.");
-            port.WriteLine("[MODE]normal");
-            port.Close();
-            port.Dispose();
-            port = null;
+            Byte[] hello = Encoding.ASCII.GetBytes("GOODBYE|FinalFantasyXIV");
+            try
+            {
+                udpClient.Send(hello, hello.Length, "127.0.0.1", 11001);
+            }
+            catch (Exception e)
+            {
+                DalamudContainer.ChatGui.PrintError(e.ToString());
+            }
+
             lastKnownClockString = string.Empty;
             clockString = string.Empty;
             isConnected = false;
