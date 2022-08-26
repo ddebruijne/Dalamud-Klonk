@@ -6,5 +6,5 @@
   "AssemblyVersion": "1.0.0.0",
   "RepoUrl": "https://github.com/danskidb/Dalamud-Klonk",
   "ApplicableVersion": "any",
-  "DalamudApiLevel": 5
+  "DalamudApiLevel": 7
 }
