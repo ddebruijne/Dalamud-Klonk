@@ -6,8 +6,10 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
+using Lumina.Excel.GeneratedSheets;
 using System.Net.Sockets;
 using System.Text;
+using Dalamud.Game.ClientState.Conditions;
 
 namespace Klonk
 {
@@ -23,6 +25,7 @@ namespace Klonk
         private bool isConnected = false;
         private string lastKnownClockString = string.Empty;
         private string clockString = string.Empty;
+        private string lastPoppedDuty = string.Empty;
         private double timeSinceLastKeepalive = 0;
         private double timeSinceLastSendString = 0;
 
@@ -47,6 +50,7 @@ namespace Klonk
             DalamudContainer.Framework.Update += OnUpdate;
             DalamudContainer.ClientState.Login += OnLogin;
             DalamudContainer.ClientState.Logout += OnLogout;
+            DalamudContainer.ClientState.CfPop += OnDutyFound;
 
             if (DalamudContainer.ClientState.IsLoggedIn)
                 ActivateKlonk();
@@ -54,7 +58,7 @@ namespace Klonk
 
         public void Dispose()
         {
-            this.UI.Dispose();
+            UI.Dispose();
             DeactivateKlonk();
             DalamudContainer.CommandManager.RemoveHandler(CommandName);
         }
@@ -93,35 +97,7 @@ namespace Klonk
             }
             timeSinceLastKeepalive += framework.UpdateDelta.TotalMilliseconds;
 
-            // Separate events based on whether we're in combat or not.
-            PlayerCharacter localPlayer = DalamudContainer.ClientState.LocalPlayer;
-            GameObject currentTarget = DalamudContainer.TargetManager.FocusTarget != null ? DalamudContainer.TargetManager.FocusTarget : DalamudContainer.TargetManager.Target;
-            if ((localPlayer.StatusFlags & StatusFlags.InCombat) != 0)
-            {
-                if (localPlayer.TargetObject != null && currentTarget.ObjectKind == ObjectKind.BattleNpc)
-                {
-                    BattleChara bc = (BattleChara)currentTarget;
-                    if(bc == null)
-                    {
-                        DalamudContainer.ChatGui.PrintError("OnUpdate: Could not cast currentTarget to BattleChara!");
-                        DeactivateKlonk();
-                    }
-
-                    if (bc.IsCasting)
-                        clockString = (bc.TotalCastTime - bc.CurrentCastTime).ToString("0.00");
-                    else
-                        clockString = GetPaddedHP(localPlayer);
-                }
-                else
-                    clockString = GetPaddedHP(localPlayer);
-            }
-            else
-            {
-                if (Configuration.SupportsText && currentTarget != null)
-                    clockString = currentTarget.Name.TextValue;
-                else
-                    clockString = GetPaddedHP(localPlayer);
-            }
+            GenerateClockString();
 
             // To not spam the device, only send an update when the text differs.
             if (!clockString.Equals(lastKnownClockString) || timeSinceLastSendString >= 1000)
@@ -153,6 +129,11 @@ namespace Klonk
         private unsafe void OnLogout(object sender, System.EventArgs e)
         {
             DeactivateKlonk();
+        }
+
+        private void OnDutyFound(object sender, ContentFinderCondition condition)
+        {
+            lastPoppedDuty = condition.Name.ToString();
         }
 
         private void DrawUI()
@@ -202,6 +183,45 @@ namespace Klonk
             lastKnownClockString = string.Empty;
             clockString = string.Empty;
             isConnected = false;
+        }
+    
+        private void GenerateClockString()
+        {
+            if (DalamudContainer.Condition[ConditionFlag.WaitingForDutyFinder] && !DalamudContainer.Condition[ConditionFlag.WaitingForDuty])
+            {
+                clockString = $"{lastPoppedDuty} is Ready";
+                return;
+            }
+
+            // Separate events based on whether we're in combat or not.
+            PlayerCharacter localPlayer = DalamudContainer.ClientState.LocalPlayer;
+            GameObject currentTarget = DalamudContainer.TargetManager.FocusTarget != null ? DalamudContainer.TargetManager.FocusTarget : DalamudContainer.TargetManager.Target;
+            if ((localPlayer.StatusFlags & StatusFlags.InCombat) != 0)
+            {
+                if (localPlayer.TargetObject != null && currentTarget.ObjectKind == ObjectKind.BattleNpc)
+                {
+                    BattleChara bc = (BattleChara)currentTarget;
+                    if (bc == null)
+                    {
+                        DalamudContainer.ChatGui.PrintError("OnUpdate: Could not cast currentTarget to BattleChara!");
+                        DeactivateKlonk();
+                    }
+
+                    if (bc.IsCasting)
+                        clockString = (bc.TotalCastTime - bc.CurrentCastTime).ToString("0.00");
+                    else
+                        clockString = GetPaddedHP(localPlayer);
+                }
+                else
+                    clockString = GetPaddedHP(localPlayer);
+            }
+            else
+            {
+                if (Configuration.SupportsText && currentTarget != null)
+                    clockString = currentTarget.Name.TextValue;
+                else
+                    clockString = GetPaddedHP(localPlayer);
+            }
         }
     }
 }

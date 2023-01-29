@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net5.0-windows</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <Platforms>x64</Platforms>
     <Company>Danny de Bruijne</Company>
     <AssemblyTitle>Klonk</AssemblyTitle>
@@ -44,6 +44,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Lumina.Excel" Version="6.3.2" />
     <PackageReference Include="SerialPortStream" Version="2.4.0" />
   </ItemGroup>
   
